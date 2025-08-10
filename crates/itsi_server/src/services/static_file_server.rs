@@ -16,6 +16,7 @@ use http::{
     },
     HeaderName, HeaderValue, Response, StatusCode,
 };
+use hyper::body::Body;
 use itsi_error::Result;
 use parking_lot::{Mutex, RwLock};
 use percent_encoding::percent_decode_str;
@@ -112,7 +113,6 @@ struct CacheEntry {
     last_modified: SystemTime,
     headers_ct: HeaderValue,
     headers_etag: HeaderValue,
-    headers_cl: HeaderValue,
     last_modified_http_date: HeaderValue,
     last_checked: Arc<RwLock<Instant>>,
 }
@@ -177,7 +177,6 @@ impl CacheEntry {
         };
         let headers_ct = get_mime_type(&path);
         let headers_etag = format!(r#"W/"{etag}""#).parse().unwrap();
-        let headers_cl = ((bytes.len() as u64).to_string()).parse().unwrap();
         Ok(Arc::new(CacheEntry {
             content: Arc::new(bytes),
             gz: read_variant(&path, "gz").await.map(Arc::new),
@@ -186,7 +185,6 @@ impl CacheEntry {
             deflate: read_variant(&path, "deflate").await.map(Arc::new),
             headers_ct,
             headers_etag,
-            headers_cl,
             last_modified,
             last_modified_http_date: format_http_date_header(last_modified),
             last_checked: Arc::new(RwLock::new(Instant::now())),
@@ -211,7 +209,6 @@ impl CacheEntry {
         };
         let headers_ct = get_mime_type(&path);
         let headers_etag = format!(r#"W/"{etag}""#).parse().unwrap();
-        let headers_cl = directory_listing.len().to_string().parse().unwrap();
         let last_modified = SystemTime::now();
         Arc::new(CacheEntry {
             content: Arc::new(directory_listing),
@@ -221,7 +218,6 @@ impl CacheEntry {
             deflate: None,
             headers_ct,
             headers_etag,
-            headers_cl,
             last_modified,
             last_modified_http_date: format_http_date_header(last_modified),
             last_checked: Arc::new(RwLock::new(Instant::now())),
@@ -906,13 +902,20 @@ impl StaticFileServer {
         } else {
             // Return the full content
             let (content, encoding) = cache_entry.suggest_content_for(supported_encodings);
+            // Content-length must be based on the transfer length.
+            let content_length = content.len().to_string().parse().unwrap();
             let body = build_ok_body(content);
+
+            debug!(
+                "Returning cached content, length: {:?}, encoding: {:?}",
+                content_length, encoding
+            );
             build_file_response(
                 status,
                 encoding,
                 Some(cache_entry.headers_etag.clone()),
                 cache_entry.headers_ct.clone(),
-                cache_entry.headers_cl.clone(),
+                content_length,
                 cache_entry.last_modified_http_date.clone(),
                 content_range,
                 &self.headers,
@@ -993,6 +996,7 @@ fn build_file_response(
     body: HttpBody,
 ) -> HttpResponse {
     let mut response = Response::new(body);
+    debug!("Building response for {:?}: {:?}", status, content_length);
 
     *response.status_mut() = status;
     let headers_mut = response.headers_mut();

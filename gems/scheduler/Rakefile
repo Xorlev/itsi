@@ -22,3 +22,4 @@ RbSys::ExtensionTask.new("itsi-scheduler", GEMSPEC) do |ext|
 end
 
 task default: %i[compile test rubocop]
+Bundler::GemHelper.install_tasks

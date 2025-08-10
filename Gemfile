@@ -4,6 +4,9 @@ gemspec
 gemspec path: 'gems/server'
 gemspec path: 'gems/scheduler'
 
+gem 'itsi-server', git: 'https://github.com/xorlev/itsi', branch: 'content-length-fix', glob: 'gems/server/*.gemspec'
+gem 'itsi-scheduler', git: 'https://github.com/xorlev/itsi', branch: 'content-length-fix', glob: 'gems/scheduler/*.gemspec'
+
 group :test do
   gem 'activerecord'
   gem 'jwt'

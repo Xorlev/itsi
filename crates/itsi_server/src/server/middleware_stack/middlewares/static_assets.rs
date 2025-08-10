@@ -14,6 +14,7 @@ use http::{
     header::{IF_MODIFIED_SINCE, RANGE},
     HeaderMap, HeaderValue, Method,
 };
+use hyper::body::Body;
 use itsi_error::ItsiError;
 use magnus::error::Result;
 use quick_cache::sync::Cache;
@@ -118,7 +119,7 @@ impl MiddlewareLayer for StaticAssets {
             }
         };
 
-        debug!(target: "middleware::static_assets", "Asset path is {}", rel_path);
+        debug!(target: "middleware::static_assets", "Asset2 path is {}", rel_path);
         // Determine if this is a HEAD request
         let is_head_request = req.method() == Method::HEAD;
 
@@ -150,7 +151,9 @@ impl MiddlewareLayer for StaticAssets {
         if response.is_none() {
             Ok(Either::Left(req))
         } else {
-            Ok(Either::Right(response.unwrap()))
+            let response = response.unwrap();
+            debug!(target: "middleware::static_assets", "Serving asset, status: {}, headers: {:?}, size_hint: {:?}", response.status(), response.headers(), response.size_hint());
+            Ok(Either::Right(response))
         }
     }
 }
